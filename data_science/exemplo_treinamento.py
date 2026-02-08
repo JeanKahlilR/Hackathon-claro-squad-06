@@ -88,7 +88,9 @@ def main():
             'class_weight': 'balanced',
             'normalizar': True
         },
-        threshold=0.5
+        threshold=0.5,
+        salvar_graficos_ks=True,
+        output_dir_graficos="output/ks_por_etapa",
     )
 
     # PARTE 2: Treinar Gradient Boosting
@@ -104,7 +106,9 @@ def main():
             'max_depth': 3,
             'subsample': 0.8
         },
-        threshold=0.5
+        threshold=0.5,
+        salvar_graficos_ks=True,
+        output_dir_graficos="output/ks_por_etapa",
     )
 
     # Opção 3: Comparar ambos os modelos
@@ -132,6 +136,7 @@ def main():
         "output/comparacao_modelos.csv",
         index=False
     )
+    graficos_ks = treinamento.graficos_ks
 
     logger.success("\n" + "="*70)
     logger.success("PIPELINE CONCLUÍDO COM SUCESSO!")
@@ -141,6 +146,10 @@ def main():
     logger.info("  - output/resumo_regressao_logistica.csv")
     logger.info("  - output/resumo_gradient_boosting.csv")
     logger.info("  - output/comparacao_modelos.csv")
+    logger.info("  - output/ks_por_etapa/*.png")
+    for nome_modelo, caminhos_por_etapa in graficos_ks.items():
+        for etapa, caminho_grafico in caminhos_por_etapa.items():
+            logger.info(f"  - {caminho_grafico} ({nome_modelo}, etapa {etapa})")
 
     # Retornar objetos para uso interativo
     return {
@@ -150,7 +159,8 @@ def main():
         'tables_gc': tabelas_gc,
         'metadata': metadata,
         'treinamento': treinamento,
-        'resultados': resultados_comparacao
+        'resultados': resultados_comparacao,
+        'graficos_ks': graficos_ks,
     }
 
 if __name__ == "__main__":
