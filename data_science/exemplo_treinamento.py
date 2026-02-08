@@ -7,7 +7,7 @@ import os
 from loguru import logger
 from data_science.processamento_dados import make_spark, load_all_sources
 from data_science.utils import configure_logger
-from data_science.modelagem import preparar_dados_modelagem
+from data_science.modelagem import preparar_dados_modelagem, TreinamentoIncremental
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
 
     logger.info(f"Diretório de dados: {BASE_DIR}")
 
-    tables = load_all_sources(
+    tabelas = load_all_sources(
         spark=spark,
         base_dir=BASE_DIR,
         csv_sep=",",
@@ -44,7 +44,7 @@ def main():
     logger.info("\n>>> ETAPA 2: SPLIT TREINO/OOT")
 
     # Chamar a função de preparação de dados
-    tabelas_treino_oot, metadata, tabelas_gc = preparar_dados_modelagem(tables)
+    tabelas_treino_oot, metadata, tabelas_gc = preparar_dados_modelagem(tabelas)
 
     # Exibir informações sobre os dados preparados
     logger.info(f"\nDados preparados para {len(tabelas_treino_oot)} tabelas:")
@@ -67,10 +67,91 @@ def main():
 
 
     # 3. Treinamento Incremental
+    logger.info("\n>>> ETAPA 3: TREINAMENTO INCREMENTAL")
+
+    # Inicializar treinamento incremental
+    treinamento = TreinamentoIncremental(
+        tables_splited=tabelas_treino_oot,
+        etapas=[1, 2, 3, 4, 5, 6]  # Etapas disponiveis
+    )
+
+    # PARTE 1: Treinar Regressão Logística
+    logger.info("\n" + "="*70)
+    logger.info("PARTE 1: REGRESSÃO LOGÍSTICA")
+    logger.info("="*70)
+
+    df_resumo_lr = treinamento.executar_treinamento_incremental(
+        tipo_modelo='logistica',
+        params_modelo={
+            'C': 1.0,
+            'max_iter': 1000,
+            'class_weight': 'balanced',
+            'normalizar': True
+        },
+        threshold=0.5
+    )
+
+    # PARTE 2: Treinar Gradient Boosting
+    logger.info("\n" + "="*70)
+    logger.info("PARTE 2: GRADIENT BOOSTING")
+    logger.info("="*70)
+
+    df_resumo_gb = treinamento.executar_treinamento_incremental(
+        tipo_modelo='gradient_boosting',
+        params_modelo={
+            'n_estimators': 100,
+            'learning_rate': 0.1,
+            'max_depth': 3,
+            'subsample': 0.8
+        },
+        threshold=0.5
+    )
+
+    # Opção 3: Comparar ambos os modelos
+    logger.info("\n" + "="*70)
+    logger.info("OPÇÃO 3: COMPARAÇÃO DE MODELOS")
+    logger.info("="*70)
+
+    # Comparação de modelos
+    resultados_comparacao = treinamento.comparar_modelos(
+        df_resumo_lr=df_resumo_lr,
+        df_resumo_gb=df_resumo_gb
+    )
 
 
     # 4. Salvar resultados
-    return
+    logger.info("\n>>> ETAPA 4: SALVANDO RESULTADOS")
+    treinamento.salvar_resultados(
+        caminho="output/resultados_incrementais.csv"
+    )
+
+    # Salvar resumos individuais
+    df_resumo_lr.to_csv("output/resumo_regressao_logistica.csv", index=False)
+    df_resumo_gb.to_csv("output/resumo_gradient_boosting.csv", index=False)
+    resultados_comparacao['comparacao'].to_csv(
+        "output/comparacao_modelos.csv",
+        index=False
+    )
+
+    logger.success("\n" + "="*70)
+    logger.success("PIPELINE CONCLUÍDO COM SUCESSO!")
+    logger.success("="*70)
+    logger.info("\nArquivos gerados:")
+    logger.info("  - output/resultados_incrementais.csv")
+    logger.info("  - output/resumo_regressao_logistica.csv")
+    logger.info("  - output/resumo_gradient_boosting.csv")
+    logger.info("  - output/comparacao_modelos.csv")
+
+    # Retornar objetos para uso interativo
+    return {
+        'spark': spark,
+        'tables': tabelas,
+        'tabelas_treino_oot': tabelas_treino_oot,
+        'tables_gc': tabelas_gc,
+        'metadata': metadata,
+        'treinamento': treinamento,
+        'resultados': resultados_comparacao
+    }
 
 if __name__ == "__main__":
     resultados = main()
