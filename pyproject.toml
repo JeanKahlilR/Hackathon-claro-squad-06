@@ -10,4 +10,5 @@ dependencies = [
     "pyspark>=4.1.1",
     "pytest>=9.0.2",
     "scikit-learn>=1.8.0",
+    "scikit-plot>=0.3.7",
 ]

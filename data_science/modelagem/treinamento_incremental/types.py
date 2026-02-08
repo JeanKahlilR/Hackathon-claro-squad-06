@@ -4,6 +4,7 @@ Tipos compartilhados do fluxo de treinamento incremental.
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, TypedDict, Union
+import numpy as np
 import pandas as pd
 from pyspark.sql import DataFrame as SparkDataFrame
 
@@ -32,6 +33,8 @@ class ResultadoEtapa(TypedDict, total=False):
     recall: float
     f1_score: float
     modelo: str
+    y_true_oot: np.ndarray
+    y_pred_proba_oot: np.ndarray
 
 
 TablesSplited = Dict[str, Dict[str, Union[SparkDataFrame, pd.DataFrame]]]
@@ -49,7 +52,10 @@ class EstadoIncremental:
         Resultados consolidados por modelo/etapa.
     modelos_treinados : Dict[str, Any]
         Modelos treinados indexados por chave de etapa.
+    graficos_ks : Dict[str, Dict[int, str]]
+        Caminhos dos graficos KS por tipo de modelo e etapa.
     """
 
     resultados: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     modelos_treinados: Dict[str, Any] = field(default_factory=dict)
+    graficos_ks: Dict[str, Dict[int, str]] = field(default_factory=dict)
