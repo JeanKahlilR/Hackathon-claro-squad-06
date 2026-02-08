@@ -1,8 +1,10 @@
 """
 Arquivo orquestrador da pipeline de treinamento incremental
 """
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 from loguru import logger
 
@@ -10,7 +12,12 @@ from ..config import BENCHMARK_KS, COLUNAS_EXCLUIR, TARGET_COLUMN, listar_etapas
 from ..modelos import ModeloBase
 from .data_builder import obter_splits_etapa, selecionar_para_pandas
 from .evaluator import avaliar_resultado_etapa
-from .reporting import criar_comparacao_modelos, criar_resumo_incremental, resultados_para_dataframe
+from .reporting import (
+    criar_comparacao_modelos,
+    criar_resumo_incremental,
+    resultados_para_dataframe,
+    salvar_grafico_ks_etapa,
+)
 from .trainer import criar_modelo, treinar_e_prever_oot
 from .types import EstadoIncremental, ResultadoEtapa, TablesSplited
 
@@ -76,6 +83,13 @@ class TreinamentoIncremental:
             Dicionario com modelos indexados por chave de etapa e nome.
         """
         return self.estado.modelos_treinados
+
+    @property
+    def graficos_ks(self) -> Dict[str, Dict[int, str]]:
+        """
+        Retorna caminhos de graficos KS por tipo de modelo e etapa.
+        """
+        return self.estado.graficos_ks
 
     def _preparar_dados_etapa(
         self,
@@ -149,7 +163,7 @@ class TreinamentoIncremental:
         etapa: int,
         modelo: ModeloBase,
         threshold: float = 0.5,
-    ) -> ResultadoEtapa:
+    ) -> Tuple[ResultadoEtapa, np.ndarray, np.ndarray]:
         """
         Treina e avalia uma etapa especifica do fluxo incremental.
 
@@ -164,8 +178,11 @@ class TreinamentoIncremental:
 
         Returns
         -------
-        ResultadoEtapa
-            Dicionario com metricas, features e artefatos da etapa.
+        Tuple[ResultadoEtapa, np.ndarray, np.ndarray]
+            Resultado tipado e vetores usados no grafico KS da etapa:
+            - resultado
+            - y_true_oot
+            - y_pred_proba_oot
         """
         logger.info("\n" + "=" * 70)
         logger.info(f"ETAPA {etapa}: {obter_nome_etapa(etapa)}")
@@ -193,13 +210,15 @@ class TreinamentoIncremental:
 
         chave_modelo = f"etapa_{etapa}_{modelo.nome.replace(' ', '_').lower()}"
         self.estado.modelos_treinados[chave_modelo] = modelo
-        return resultado
+        return resultado, y_oot.values, y_pred_proba_oot
 
     def executar_treinamento_incremental(
         self,
         tipo_modelo: str = "logistica",
         params_modelo: Optional[Dict] = None,
         threshold: float = 0.5,
+        salvar_graficos_ks: bool = True,
+        output_dir_graficos: str = "output/ks_por_etapa",
     ) -> pd.DataFrame:
         """
         Executa o treinamento incremental de um unico tipo de modelo.
@@ -212,6 +231,10 @@ class TreinamentoIncremental:
             Hiperparametros do modelo.
         threshold : float, optional
             Threshold para classificacao binaria na avaliacao.
+        salvar_graficos_ks : bool, optional
+            Se deve salvar grafico KS de cada etapa usando `skplt.metrics.plot_ks_statistic`.
+        output_dir_graficos : str, optional
+            Diretorio de saida dos graficos de KS.
 
         Returns
         -------
@@ -225,16 +248,29 @@ class TreinamentoIncremental:
         params_modelo = params_modelo or {}
         resultados_lista = []
         ks_anterior = 0.0
+        graficos_tipo_modelo: Dict[int, str] = {}
 
         for etapa in self.etapas:
             # Cada etapa e independente: treino e avaliacao usam apenas a propria tabela da etapa.
             modelo = criar_modelo(tipo_modelo=tipo_modelo, etapa=etapa, params_modelo=params_modelo)
-            resultado = self._treinar_etapa(etapa, modelo, threshold)
+            resultado, y_true_oot, y_pred_proba_oot = self._treinar_etapa(etapa, modelo, threshold)
 
             ks_atual = resultado["ks"]
             delta_ks = ks_atual - ks_anterior
             resultado["delta_ks"] = delta_ks
             resultado["ks_anterior"] = ks_anterior
+            resultado["y_true_oot"] = y_true_oot
+            resultado["y_pred_proba_oot"] = y_pred_proba_oot
+
+            if salvar_graficos_ks:
+                caminho_grafico = salvar_grafico_ks_etapa(
+                    y_true=y_true_oot,
+                    y_pred_proba=y_pred_proba_oot,
+                    nome_modelo=tipo_modelo,
+                    etapa=etapa,
+                    output_dir=output_dir_graficos,
+                )
+                graficos_tipo_modelo[etapa] = caminho_grafico
 
             logger.info("\n" + "-" * 70)
             logger.info(f"GANHO INCREMENTAL - ETAPA {etapa}")
@@ -249,6 +285,9 @@ class TreinamentoIncremental:
             ks_anterior = ks_atual
             self.estado.resultados[f"{tipo_modelo}_etapa_{etapa}"] = resultado
 
+        if graficos_tipo_modelo:
+            self.estado.graficos_ks[tipo_modelo] = graficos_tipo_modelo
+
         df_resumo = criar_resumo_incremental(resultados_lista)
 
         logger.info("\n" + "=" * 70)
@@ -257,6 +296,48 @@ class TreinamentoIncremental:
         logger.info(f"\n{df_resumo.to_string(index=False)}")
         logger.info("=" * 70)
         return df_resumo
+
+    def salvar_graficos_ks(
+        self,
+        output_dir_graficos: str = "output/ks_por_etapa",
+    ) -> Dict[str, Dict[int, str]]:
+        """
+        Salva graficos de KS por etapa a partir dos resultados em memoria.
+
+        Essa funcao usa os vetores `y_true_oot` e `y_pred_proba_oot` guardados
+        durante `executar_treinamento_incremental`.
+        """
+        output_dir = Path(output_dir_graficos)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        graficos_gerados: Dict[str, Dict[int, str]] = {}
+        for chave, resultado in self.estado.resultados.items():
+            y_true = resultado.get("y_true_oot")
+            y_pred_proba = resultado.get("y_pred_proba_oot")
+            etapa = resultado.get("etapa")
+
+            if y_true is None or y_pred_proba is None or etapa is None:
+                continue
+
+            tipo_modelo = chave.split("_etapa_")[0]
+            caminho = salvar_grafico_ks_etapa(
+                y_true=y_true,
+                y_pred_proba=y_pred_proba,
+                nome_modelo=tipo_modelo,
+                etapa=int(etapa),
+                output_dir=str(output_dir),
+            )
+
+            if tipo_modelo not in graficos_gerados:
+                graficos_gerados[tipo_modelo] = {}
+            graficos_gerados[tipo_modelo][int(etapa)] = caminho
+
+        if graficos_gerados:
+            self.estado.graficos_ks.update(graficos_gerados)
+        else:
+            logger.warning("Nenhum grafico KS foi gerado. Rode o treinamento incremental antes.")
+
+        return self.estado.graficos_ks
 
     def salvar_resultados(self, caminho: str = "data_science/output/resultados_incrementais.csv") -> None:
         """
