@@ -1,0 +1,13 @@
+[project]
+name = "hackathon-claro-squad-06"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "loguru>=0.7.3",
+    "pandas>=3.0.0",
+    "pyspark>=4.1.1",
+    "pytest>=9.0.2",
+    "scikit-learn>=1.8.0",
+]

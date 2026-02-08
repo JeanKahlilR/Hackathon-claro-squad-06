@@ -10,6 +10,7 @@ data/
 *.json
 *.zip
 *.rar
+*.log
 
 # =================================================
 # 2. CREDENCIAIS E NUVEM (AWS/ENGINEERING)
@@ -34,3 +35,7 @@ venv/
 # =================================================
 .DS_Store
 Thumbs.db
+
+
+output/
+logs/
