@@ -8,7 +8,24 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import scikitplot as skplt
+
+
+def _import_scikitplot_compat():
+    """
+    Importa scikit-plot com compatibilidade para versoes novas do SciPy.
+
+    Algumas versoes do `scikit-plot` ainda tentam importar `scipy.interp`,
+    removido em versoes recentes do SciPy. Neste caso, cria um alias para
+    `numpy.interp` antes de importar o pacote.
+    """
+    import scipy
+
+    if not hasattr(scipy, "interp"):
+        scipy.interp = np.interp  # type: ignore[attr-defined]
+
+    import scikitplot as skplt
+
+    return skplt
 
 
 def criar_resumo_incremental(resultados_lista: List[Dict]) -> pd.DataFrame:
@@ -158,6 +175,7 @@ def salvar_grafico_ks_etapa(
     caminho_saida = output_path / nome_arquivo
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    skplt = _import_scikitplot_compat()
     skplt.metrics.plot_ks_statistic(y_true_array, y_pred_proba_2d, ax=ax)
     ax.set_title(f"KS - {nome_modelo} - Etapa {etapa}")
     fig.tight_layout()
