@@ -64,6 +64,52 @@ def _validar_probabilidades(
     return serie.to_numpy(dtype=float)
 
 
+def _encontrar_threshold_max_ks_com_arrays_validados(
+    y_true_int: np.ndarray,
+    y_pred_proba_float: np.ndarray,
+) -> tuple[float, float]:
+    """
+    Encontra o threshold que maximiza KS assumindo entradas validadas.
+
+    Retorna
+    -------
+    tuple[float, float]
+        (threshold_otimo, ks_no_threshold_otimo_em_percentual)
+    """
+    df = pd.DataFrame(
+        {
+            "y_true": y_true_int,
+            "y_pred_proba": y_pred_proba_float,
+        }
+    )
+
+    df["bad"] = df["y_true"]
+    df["good"] = 1 - df["y_true"]
+
+    total_bad = int(df["bad"].sum())
+    total_good = int(df["good"].sum())
+
+    if total_bad == 0 or total_good == 0:
+        logger.warning("Threshold otimo por KS nao pode ser calculado: apenas uma classe presente")
+        return 0.5, 0.0
+
+    # Agrupar por score evita distorcao por empates no ponto de corte.
+    curva_ks = (
+        df.groupby("y_pred_proba", as_index=False)[["bad", "good"]]
+        .sum()
+        .sort_values("y_pred_proba", ascending=False)
+        .reset_index(drop=True)
+    )
+    curva_ks["cum_bad_rate"] = curva_ks["bad"].cumsum() / total_bad
+    curva_ks["cum_good_rate"] = curva_ks["good"].cumsum() / total_good
+    curva_ks["ks"] = abs(curva_ks["cum_bad_rate"] - curva_ks["cum_good_rate"])
+
+    idx_melhor = int(curva_ks["ks"].idxmax())
+    melhor_threshold = float(curva_ks.loc[idx_melhor, "y_pred_proba"])
+    melhor_ks = float(curva_ks.loc[idx_melhor, "ks"] * 100)
+    return melhor_threshold, melhor_ks
+
+
 def _calcular_ks_com_arrays_validados(
     y_true_int: np.ndarray,
     y_pred_proba_float: np.ndarray,
@@ -367,6 +413,7 @@ def avaliar_modelo_completo(
     y_true: np.ndarray,
     y_pred_proba: np.ndarray,
     threshold: float = 0.5,
+    usar_threshold_otimo_ks: bool = True,
     flag_instalacao: Optional[np.ndarray] = None,
     nome_modelo: str = "Modelo",
 ) -> Dict:
@@ -381,6 +428,9 @@ def avaliar_modelo_completo(
         Probabilidades preditas para a classe positiva (mau pagador)
     threshold : float, optional
         Threshold para classificacao binaria (default: 0.5)
+    usar_threshold_otimo_ks : bool, optional
+        Se True, usa o threshold que maximiza KS para gerar predicoes binarias.
+        Se False, usa o threshold informado no parametro `threshold`.
     flag_instalacao : Optional[np.ndarray], optional
         Flag da politica vigente para analise swap-in/out
     nome_modelo : str, optional
@@ -419,15 +469,35 @@ def avaliar_modelo_completo(
 
     resultados = {
         "nome_modelo": nome_modelo,
-        "threshold": threshold,
+        "threshold_informado": float(threshold),
+        "usar_threshold_otimo_ks": usar_threshold_otimo_ks,
     }
 
-    # 1. KS
-    ks = _calcular_ks_com_arrays_validados(y_true_int, y_pred_proba_float)
+    # 1. KS e threshold otimo pelo proprio KS
+    threshold_otimo_ks, ks_threshold_otimo = _encontrar_threshold_max_ks_com_arrays_validados(
+        y_true_int,
+        y_pred_proba_float,
+    )
+    ks = ks_threshold_otimo
     resultados["ks"] = ks
     logger.info(f"KS: {ks:.2f}")
     logger.info(f"Benchmark KS: {BENCHMARK_KS:.2f}")
     logger.info(f"Delta vs Benchmark: {ks - BENCHMARK_KS:+.2f}")
+
+    threshold_utilizado = threshold_otimo_ks if usar_threshold_otimo_ks else float(threshold)
+
+    resultados["threshold_otimo_ks"] = threshold_otimo_ks
+    resultados["ks_threshold_otimo"] = ks_threshold_otimo
+    resultados["threshold"] = threshold_utilizado
+
+    logger.info(f"Threshold informado: {float(threshold):.6f}")
+    logger.info(
+        f"Threshold otimo (max KS): {threshold_otimo_ks:.6f} | KS no cutoff: {ks_threshold_otimo:.2f}"
+    )
+    logger.info(
+        f"Threshold utilizado na classificacao: {threshold_utilizado:.6f} "
+        f"({'KS' if usar_threshold_otimo_ks else 'informado'})"
+    )
 
     # 2. Gini
     gini = calcular_gini(y_true_int, y_pred_proba_float)
@@ -440,7 +510,7 @@ def avaliar_modelo_completo(
     logger.info(f"AUC-ROC: {auc:.4f}")
 
     # 4. Matriz de Confusao
-    y_pred = (y_pred_proba_float >= threshold).astype(int)
+    y_pred = (y_pred_proba_float >= threshold_utilizado).astype(int)
     cm = confusion_matrix(y_true_int, y_pred, labels=[0, 1])
     resultados["matriz_confusao"] = cm
 

@@ -88,7 +88,6 @@ def main():
             'class_weight': 'balanced',
             'normalizar': True
         },
-        threshold=0.5,
         salvar_graficos_ks=True,
         output_dir_graficos="output/ks_por_etapa",
     )
@@ -103,10 +102,9 @@ def main():
         params_modelo={
             'n_estimators': 100,
             'learning_rate': 0.1,
-            'max_depth': 3,
+            'max_depth': 4,
             'subsample': 0.8
         },
-        threshold=0.5,
         salvar_graficos_ks=True,
         output_dir_graficos="output/ks_por_etapa",
     )
