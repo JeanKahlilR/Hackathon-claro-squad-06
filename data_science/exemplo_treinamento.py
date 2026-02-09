@@ -5,9 +5,9 @@ Demonstra como treinar modelos com visão incremental de KS.
 
 import os
 from loguru import logger
-from data_science.processamento_dados import make_spark, load_all_sources
-from data_science.utils import configure_logger
-from data_science.modelagem import preparar_dados_modelagem, TreinamentoIncremental
+from processamento_dados import make_spark, load_all_sources
+from utils import configure_logger
+from modelagem import preparar_dados_modelagem, TreinamentoIncremental
 
 
 def main():
