@@ -21,7 +21,8 @@ def criar_modelo(
     Parameters
     ----------
     tipo_modelo : str
-        Tipo do modelo (ex.: "logistica", "lr", "gradient_boosting", "gb").
+        Tipo do modelo (ex.: "logistica", "lr", "gradient_boosting",
+        "gb", "hist_gradient_boosting", "hgb").
     etapa : int
         Numero da etapa usado para identificacao no nome do modelo.
     params_modelo : Optional[Dict], optional
@@ -45,6 +46,10 @@ def criar_modelo(
         "lr": f"Regressao Logistica - Etapa {etapa}",
         "gradient_boosting": f"Gradient Boosting - Etapa {etapa}",
         "gb": f"Gradient Boosting - Etapa {etapa}",
+        "gbm": f"Gradient Boosting - Etapa {etapa}",
+        "hist_gradient_boosting": f"Hist Gradient Boosting - Etapa {etapa}",
+        "hgb": f"Hist Gradient Boosting - Etapa {etapa}",
+        "hist_gb": f"Hist Gradient Boosting - Etapa {etapa}",
     }
     nome_default = nomes_padrao.get(tipo)
     if nome_default is None:
