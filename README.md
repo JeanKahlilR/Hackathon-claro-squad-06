@@ -1,10 +1,7 @@
 # Hackathon: Risco de Crédito
 ![Descrição da Imagem](docs/Capa.png)
 
-<<<<<<< HEAD
 
-
-=======
 # Problema de Negócio
 Uma grande empresa do setor de telecomunicações busca expandir sua base de clientes em planos de maior valor (Controle) de forma sustentável. O desafio central é equilibrar o crescimento da carteira com uma gestão de risco eficiente, focando na migração de usuários do segmento Pré-pago, que representam a principal porta de entrada de novos clientes.
 
@@ -96,5 +93,5 @@ flowchart LR
 ![Parquet](https://img.shields.io/badge/Data-Parquet-4E9A06?style=for-the-badge&logo=databricks&logoColor=white)
 <br>
 ![Google Colab](https://img.shields.io/badge/Colab-Research-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)
->>>>>>> 9c11e9b6d923319bb016a3f8a83bb0f6f9aeee69
+
 
