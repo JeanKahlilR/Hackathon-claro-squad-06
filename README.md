@@ -84,6 +84,12 @@ flowchart LR
 
 - Flags de Metadados: Criação de colunas binárias (ex: PAG_HISTORICO_MISSING) para sinalizar explicitamente ao modelo a origem da ausência do dado.
 
+**Notebooks**
+<br>
+[Tratamento Inicial](notebooks/Broze-Silver_EMR.ipynb)
+<br>
+[Baseline](notebooks/Baseline_Colab.ipynb )
+
 **Tecnologias Utilizadas**
 <br>
 ![Python](https://img.shields.io/badge/python-3.10-3776AB?style=for-the-badge&logo=python&logoColor=white)
