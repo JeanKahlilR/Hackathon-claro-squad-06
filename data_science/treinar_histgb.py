@@ -5,6 +5,7 @@ Script para treino incremental usando apenas Hist Gradient Boosting (HGB).
 import os
 from pathlib import Path
 
+import joblib
 import pandas as pd
 from loguru import logger
 from modelagem import TreinamentoIncremental, preparar_dados_modelagem
@@ -56,6 +57,36 @@ def salvar_matrizes_confusao_por_etapa(resultados: dict, caminho: str) -> None:
     )
     df_matriz_confusao.to_csv(output_path, index=False)
     logger.success(f"Matrizes de confusao salvas em: {output_path}")
+
+
+def salvar_modelo_final_joblib(
+    modelos_treinados: dict,
+    caminho: str,
+    etapa_final: int,
+) -> None:
+    """
+    Salva em joblib o modelo treinado da etapa final.
+    """
+    if not modelos_treinados:
+        logger.warning("Nenhum modelo treinado encontrado para salvar")
+        return
+
+    prefixo_etapa_final = f"etapa_{etapa_final}_"
+    candidatos = [
+        (chave, modelo)
+        for chave, modelo in modelos_treinados.items()
+        if chave.startswith(prefixo_etapa_final)
+    ]
+
+    if not candidatos:
+        logger.warning(f"Nenhum modelo encontrado para a etapa final {etapa_final}")
+        return
+
+    chave_modelo, modelo_final = candidatos[-1]
+    output_path = Path(caminho)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(modelo_final, output_path)
+    logger.success(f"Modelo final salvo em: {output_path} ({chave_modelo})")
 
 
 def main():
@@ -143,11 +174,17 @@ def main():
     logger.info("\n>>> ETAPA 4: SALVANDO RESULTADOS")
     caminho_resultados = "output/resultados_incrementais_hgb.csv"
     caminho_matriz_confusao = "output/matriz_confusao_por_etapa_hgb.csv"
+    caminho_modelo_final = "output/modelo_final_hgb.pkl"
 
     treinamento.salvar_resultados(caminho=caminho_resultados)
     salvar_matrizes_confusao_por_etapa(
         resultados=treinamento.resultados,
         caminho=caminho_matriz_confusao,
+    )
+    salvar_modelo_final_joblib(
+        modelos_treinados=treinamento.modelos_treinados,
+        caminho=caminho_modelo_final,
+        etapa_final=max(treinamento.etapas),
     )
     df_resumo_hgb.to_csv("output/resumo_hist_gradient_boosting_hgb.csv", index=False)
     graficos_ks = treinamento.graficos_ks
@@ -158,6 +195,7 @@ def main():
     logger.info("\nArquivos gerados:")
     logger.info(f"  - {caminho_resultados}")
     logger.info(f"  - {caminho_matriz_confusao}")
+    logger.info(f"  - {caminho_modelo_final}")
     logger.info("  - output/resumo_hist_gradient_boosting_hgb.csv")
     logger.info("  - output/ks_por_etapa_hgb/*.png")
     for nome_modelo, caminhos_por_etapa in graficos_ks.items():
