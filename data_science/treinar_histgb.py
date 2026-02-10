@@ -3,11 +3,59 @@ Script para treino incremental usando apenas Hist Gradient Boosting (HGB).
 """
 
 import os
+from pathlib import Path
 
+import pandas as pd
 from loguru import logger
 from modelagem import TreinamentoIncremental, preparar_dados_modelagem
 from processamento_dados import load_all_sources, make_spark
 from utils import configure_logger
+
+
+def salvar_matrizes_confusao_por_etapa(resultados: dict, caminho: str) -> None:
+    """
+    Salva as matrizes de confusao (2x2) de cada etapa em um unico CSV.
+    """
+    registros = []
+
+    for modelo, resultado in resultados.items():
+        matriz_confusao = resultado.get("matriz_confusao")
+        if matriz_confusao is None:
+            continue
+
+        try:
+            tn = int(matriz_confusao[0][0])
+            fp = int(matriz_confusao[0][1])
+            fn = int(matriz_confusao[1][0])
+            tp = int(matriz_confusao[1][1])
+        except (TypeError, IndexError, ValueError):
+            logger.warning(f"Matriz de confusao invalida ignorada para {modelo}")
+            continue
+
+        registros.append(
+            {
+                "modelo": modelo,
+                "etapa": resultado.get("etapa"),
+                "nome_etapa": resultado.get("nome_etapa"),
+                "tn_real0_pred0": tn,
+                "fp_real0_pred1": fp,
+                "fn_real1_pred0": fn,
+                "tp_real1_pred1": tp,
+            }
+        )
+
+    if not registros:
+        logger.warning("Nenhuma matriz de confusao encontrada para salvar")
+        return
+
+    output_path = Path(caminho)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df_matriz_confusao = pd.DataFrame(registros).sort_values(
+        by=["etapa", "modelo"],
+        na_position="last",
+    )
+    df_matriz_confusao.to_csv(output_path, index=False)
+    logger.success(f"Matrizes de confusao salvas em: {output_path}")
 
 
 def main():
@@ -93,7 +141,14 @@ def main():
 
     # 4. Salvar resultados
     logger.info("\n>>> ETAPA 4: SALVANDO RESULTADOS")
-    treinamento.salvar_resultados(caminho="output/resultados_incrementais_hgb.csv")
+    caminho_resultados = "output/resultados_incrementais_hgb.csv"
+    caminho_matriz_confusao = "output/matriz_confusao_por_etapa_hgb.csv"
+
+    treinamento.salvar_resultados(caminho=caminho_resultados)
+    salvar_matrizes_confusao_por_etapa(
+        resultados=treinamento.resultados,
+        caminho=caminho_matriz_confusao,
+    )
     df_resumo_hgb.to_csv("output/resumo_hist_gradient_boosting_hgb.csv", index=False)
     graficos_ks = treinamento.graficos_ks
 
@@ -101,7 +156,8 @@ def main():
     logger.success("PIPELINE CONCLUIDO COM SUCESSO!")
     logger.success("=" * 70)
     logger.info("\nArquivos gerados:")
-    logger.info("  - output/resultados_incrementais_hgb.csv")
+    logger.info(f"  - {caminho_resultados}")
+    logger.info(f"  - {caminho_matriz_confusao}")
     logger.info("  - output/resumo_hist_gradient_boosting_hgb.csv")
     logger.info("  - output/ks_por_etapa_hgb/*.png")
     for nome_modelo, caminhos_por_etapa in graficos_ks.items():
