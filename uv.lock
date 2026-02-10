@@ -88,6 +88,7 @@ name = "hackathon-claro-squad-06"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "joblib" },
     { name = "loguru" },
     { name = "pandas" },
     { name = "pyspark" },
@@ -98,6 +99,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "joblib", specifier = ">=1.5.3" },
     { name = "loguru", specifier = ">=0.7.3" },
     { name = "pandas", specifier = ">=3.0.0" },
     { name = "pyspark", specifier = ">=4.1.1" },

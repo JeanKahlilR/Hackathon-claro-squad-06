@@ -177,7 +177,18 @@ def salvar_grafico_ks_etapa(
     fig, ax = plt.subplots(figsize=(10, 6))
     skplt = _import_scikitplot_compat()
     skplt.metrics.plot_ks_statistic(y_true_array, y_pred_proba_2d, ax=ax)
-    ax.set_title(f"KS - {nome_modelo} - Etapa {etapa}")
+
+    # Reaplica estilos apos o plot para sobrescrever configuracoes padrao.
+    ax.set_title(
+        f"KS - {nome_modelo} - Etapa {etapa}",
+        fontsize=18,
+        fontweight="bold",
+    )
+    ax.set_xlabel(ax.get_xlabel(), fontweight="bold")
+    ax.set_ylabel(ax.get_ylabel(), fontweight="bold")
+    for tick in ax.get_xticklabels() + ax.get_yticklabels():
+        tick.set_fontweight("bold")
+
     fig.tight_layout()
     fig.savefig(caminho_saida, dpi=150, bbox_inches="tight")
     plt.close(fig)
