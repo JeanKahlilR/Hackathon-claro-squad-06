@@ -95,3 +95,56 @@ flowchart LR
 ![Google Colab](https://img.shields.io/badge/Colab-Research-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)
 
 
+## Arquitetura de Dados Proposta (AWS Cloud)
+![Descrição da Imagem](docs/Arquitetura_AWS.webp)
+
+A arquitetura proposta foi desenhada seguindo os pilares do `AWS Well-Architected Framework`, priorizando uma abordagem `Serverless (sem servidor)`. Isso garante que o foco do time esteja na lógica de negócio e na ciência de dados, delegando o gerenciamento de infraestrutura para a AWS, o que resulta em maior eficiência operacional, escalabilidade automática e otimização de custos.
+
+O fluxo de dados segue a arquitetura de referência `"Medalhão" (Bronze/Silver/Gold)`, garantindo a qualidade, rastreabilidade e governança dos dados desde a ingestão até a modelagem preditiva.
+
+**1 - Ingestão e Orquestração (Ingestion Layer)**
+
+- `Ferramentas`: AWS Glue Python Shell, Amazon EventBridge, AWS Secrets Manager.
+- `Como funciona`: O processo inicia-se com uma rotina agendada no Amazon EventBridge, que dispara um script de ingestão no AWS Glue Python Shell. Este script conecta-se ao Google Drive, baixa os arquivos de origem e os deposita na camada crua. **O encadeamento das etapas subsequentes é gerenciado nativamente, garantindo que a transformação só inicie após o sucesso da ingestão.**
+- `Motivo da Escolha`:
+    - `AWS Glue Python Shell`: Escolhido em detrimento do AWS Lambda para eliminar o risco de timeout (limite de 15 min) e estouro de memória ao processar arquivos volumosos, garantindo robustez para grandes cargas de dados.
+    - `Amazon EventBridge`: Desacopla o agendamento da execução, permitindo uma arquitetura orientada a eventos.
+    - `AWS Secrets Manager`: Elimina credenciais hardcoded, garantindo que chaves de API trafeguem criptografadas e em conformidade com normas de segurança.
+
+**2 - Armazenamento e Data Lake (Storage Layer)**
+
+- `Ferramentas`: Amazon S3 (Buckets Raw, Silver, Gold).
+- `Como funciona`: O Amazon S3 atua como o repositório central com três estágios lógicos (Bronze/Silver/Gold).
+    - `Raw`: Dados brutos e imutáveis (Auditabilidade).
+    - `Silver`: Dados limpos e convertidos para Parquet com compressão Snappy, otimizando performance de I/O.
+    - `Gold`: Dados agregados (Feature Store) prontos para o modelo.
+- `Motivo da Escolha`: Além da durabilidade de "11 noves", o S3 permite aplicar **Lifecycle Policies (Políticas de Ciclo de Vida)** para mover dados antigos para classes de armazenamento mais baratas (Glacier) automaticamente, atendendo ao pilar de Otimização de Custos.
+
+**3 - Processamento e Transformação (Processing Layer)**
+
+- `Ferramentas`: AWS Glue Jobs (Spark).
+- `Como funciona`: Jobs Spark processam os dados de forma distribuída.
+- `Motivo da Escolha`: O AWS Glue é totalmente gerenciado. A escolha pelo Spark permite processamento paralelo massivo, essencial para recalcular o score de milhões de clientes em minutos, garantindo `escalabilidade horizontal` transparente.
+
+**4 - Governança e Catálogo (Data Governance)**
+
+- `Ferramentas`: AWS Glue Crawler, AWS Glue Data Catalog, AWS Lake Formation.
+- `Como funciona`: O Crawler infere esquemas automaticamente (Schema Evolution) e o Lake Formation gerencia o acesso.
+- `Motivo da Escolha`:
+    - `AWS Lake Formation`: É o diferencial de segurança do projeto. Ele permite implementar **segurança a nível de linha e coluna (ex: mascarar o CPF e Renda para analistas júnior)**, garantindo conformidade estrita com a **LGPD** sem necessidade de duplicar dados anonimizados.
+
+**5 - Consumo, Analytics e Machine Learning**
+
+- `Ferramentas`: Amazon Athena, Amazon SageMaker.
+- `Como funciona`: O Athena permite SQL ad-hoc e o SageMaker gerencia o ciclo de vida do modelo.
+- `Motivo da Escolha`:
+    - `Amazon Athena`: Custo zero de infraestrutura fixa, pagando apenas por terabyte scaneado.
+    - `Amazon SageMaker`: Além do treinamento, utilizamos o **SageMaker Model Registry** para versionar os artefatos do modelo (.pkl), garantindo que saibamos exatamente qual versão do modelo gerou qual score, assegurando a reprodutibilidade científica.
+
+**6 - Observabilidade e Operações (Ops & Monitoring)**
+
+- `Ferramentas`: Amazon CloudWatch, Amazon SNS.
+- `Como funciona`: Monitoramento centralizado de logs, métricas e alarmes.
+`Motivo da Escolha`: Atende ao pilar de Excelência Operacional. A configuração de alarmes no CloudWatch integrados ao SNS permite uma abordagem **proativa**: o time é notificado sobre falhas de pipeline ou degradação de performance antes que o negócio seja impactado.
+
+
