@@ -8,7 +8,7 @@ configurações, métricas e pacotes de modelos/treinamento.
 - `preparacao_dados.py`: pipeline de preparação (remoção de grupo controle e split treino/OOT).
 - `config.py`: constantes e mapeamentos de etapas/features.
 - `metricas.py`: métricas e avaliação de performance (KS, AUC, Gini, matriz de confusão etc.).
-- `modelos/`: wrappers dos estimadores e factory de criação.
+- `modelos/`: wrappers dos modelos e factory de criação.
 - `treinamento_incremental/`: orquestração do treino incremental por etapa.
 
 ---
