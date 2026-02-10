@@ -21,6 +21,7 @@ class HistGradientBoosting(ModeloBase):
         max_depth: Optional[int] = None,
         max_leaf_nodes: int = 31,
         min_samples_leaf: int = 20,
+        max_bins: int = 255,
         l2_regularization: float = 0.0,
         early_stopping: str | bool = "auto",
         validation_fraction: float = 0.1,
@@ -35,6 +36,7 @@ class HistGradientBoosting(ModeloBase):
         self.max_depth = max_depth
         self.max_leaf_nodes = max_leaf_nodes
         self.min_samples_leaf = min_samples_leaf
+        self.max_bins = max_bins
         self.l2_regularization = l2_regularization
         self.early_stopping = early_stopping
         self.validation_fraction = validation_fraction
@@ -60,6 +62,7 @@ class HistGradientBoosting(ModeloBase):
             max_depth=self.max_depth,
             max_leaf_nodes=self.max_leaf_nodes,
             min_samples_leaf=self.min_samples_leaf,
+            max_bins=self.max_bins,
             l2_regularization=self.l2_regularization,
             early_stopping=self.early_stopping,
             validation_fraction=self.validation_fraction,
