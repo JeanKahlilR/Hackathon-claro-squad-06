@@ -7,8 +7,15 @@ Este diretório concentra os wrappers de modelos de ML e a API pública usada pe
 - `base.py`: contrato comum (`ModeloBase`)
 - `regressao_logistica.py`: implementação de Regressão Logística
 - `gradient_boosting.py`: implementação de Gradient Boosting
-- `factory.py`: registry e função `criar_modelo(...)`
+- `hist_gradient_boosting.py`: implementação de HistGradientBoosting
+- `factory.py`: registry e função `criar_modelo_factory(...)`
 - `__init__.py`: reexporta a API pública do pacote
+
+### Modelos atualmente disponíveis
+
+- `RegressaoLogistica`
+- `GradientBoosting`
+- `HistGradientBoosting`
 
 ## Passo a Passo Para Adicionar Um Novo Modelo
 
@@ -42,7 +49,15 @@ Exemplo de aliases:
 - `"random_forest"`
 - `"rf"`
 
-Com isso, `criar_modelo("rf", **params)` passa a funcionar.
+Com isso, `criar_modelo_factory("rf", **params)` passa a funcionar.
+
+Exemplo real (já implementado para HistGradientBoosting):
+
+- `"hist_gradient_boosting"`
+- `"hgb"`
+- `"hist_gb"`
+
+Com isso, `criar_modelo_factory("hgb", **params)` passa a funcionar.
 
 ### 4. Exportar o modelo no `__init__.py`
 
