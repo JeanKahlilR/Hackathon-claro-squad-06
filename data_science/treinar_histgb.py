@@ -123,7 +123,7 @@ def main():
     logger.info("=" * 70)
 
     df_resumo_hgb = treinamento.executar_treinamento_incremental(
-        tipo_modelo="hgb",
+        tipo_modelo="hist_gradient_boosting",
         params_modelo={
             "max_iter": 1000,
             "learning_rate": 0.1,
