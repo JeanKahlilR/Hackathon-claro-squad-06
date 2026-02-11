@@ -7,11 +7,36 @@ from pathlib import Path
 from typing import Dict
 
 from loguru import logger
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame
 
 from modelagem import preparar_dados_modelagem
 from processamento_dados import load_all_sources, make_spark
 from utils import configure_logger
+
+
+def validar_hadoop_home_windows() -> None:
+    """
+    Valida pre-requisitos de escrita Spark em ambiente Windows.
+    """
+    if os.name != "nt":
+        return
+
+    hadoop_home = os.environ.get("HADOOP_HOME") or os.environ.get("hadoop.home.dir")
+    if not hadoop_home:
+        raise RuntimeError(
+            "Ambiente Windows sem HADOOP_HOME/hadoop.home.dir. "
+            "Defina HADOOP_HOME apontando para um diretorio com bin/winutils.exe."
+        )
+
+    winutils_path = Path(hadoop_home) / "bin" / "winutils.exe"
+    if not winutils_path.exists():
+        raise RuntimeError(
+            f"winutils.exe nao encontrado em: {winutils_path}. "
+            "Ajuste HADOOP_HOME para a pasta correta do Hadoop no Windows."
+        )
+
+    os.environ["HADOOP_HOME"] = str(Path(hadoop_home))
+    os.environ["hadoop.home.dir"] = str(Path(hadoop_home))
 
 
 def salvar_tabelas_treino_oot_parquet(
@@ -44,49 +69,12 @@ def salvar_tabelas_treino_oot_parquet(
     logger.success(f"tabelas_treino_oot salva em: {output_root}")
 
 
-def carregar_tabelas_treino_oot_parquet(
-    spark: SparkSession,
-    diretorio_entrada: str,
-) -> Dict[str, Dict[str, DataFrame]]:
-    """
-    Carrega tabelas_treino_oot salva em parquet separado por tabela/split.
-    """
-    input_root = Path(diretorio_entrada)
-    if not input_root.exists():
-        raise FileNotFoundError(f"Diretorio nao encontrado: {input_root}")
-
-    tabelas_treino_oot: Dict[str, Dict[str, DataFrame]] = {}
-
-    for diretorio_tabela in sorted(
-        [path for path in input_root.iterdir() if path.is_dir()]
-    ):
-        nome_tabela = diretorio_tabela.name
-        splits: Dict[str, DataFrame] = {}
-
-        for nome_split in ("treino", "oot"):
-            caminho_split = diretorio_tabela / nome_split
-            if not caminho_split.exists():
-                logger.warning(
-                    f"Split '{nome_split}' nao encontrado para a tabela '{nome_tabela}'."
-                )
-                continue
-
-            splits[nome_split] = spark.read.parquet(str(caminho_split))
-
-        if splits:
-            tabelas_treino_oot[nome_tabela] = splits
-
-    logger.success(
-        f"tabelas_treino_oot carregada com {len(tabelas_treino_oot)} tabela(s) de {input_root}"
-    )
-    return tabelas_treino_oot
-
-
 def main():
     """
     Funcao principal para execucao ate a etapa de split treino/OOT.
     """
     configure_logger()
+    validar_hadoop_home_windows()
 
     logger.info("=" * 70)
     logger.info("PIPELINE PARA SALVAR TABELAS TREINO/OOT")

@@ -6,9 +6,10 @@ Este diretório reúne os componentes do pipeline de dados e modelagem do projet
 
 - `modelagem/`: preparação de dados para modelagem, métricas, modelos e treino incremental.
 - `processamento_dados/`: carregamento das fontes e criação de sessão Spark.
-- `utils/`: utilitários de apoio (ex.: configuração de logger).
+- `utils/`: utilitários de apoio (ex.: configuração de logger e carregamento de `tabelas_treino_oot`).
 - `exemplo_treinamento.py`: script de execução de exemplo (LR + GB + comparação).
 - `treinar_histgb.py`: script de execução focado em HistGradientBoosting.
+- `save_t_oot.py`: script para gerar split treino/OOT e salvar parquet separado por tabela/split.
 
 ---
 
@@ -28,6 +29,25 @@ Executa um pipeline completo de treinamento incremental com:
 
 Executa pipeline semelhante, mas treinando apenas `Hist Gradient Boosting`,
 além de salvar artefatos adicionais (matriz de confusão consolidada e modelo final em `.pkl`).
+
+### `save_t_oot.py`
+
+Executa somente:
+
+1. carregamento de dados,
+2. split treino/OOT,
+3. salvamento em `output/tabelas_treino_oot/<tabela>/<split>/`.
+
+Para carregar o dicionário salvo:
+
+```python
+from utils import carregar_tabelas_treino_oot_parquet
+
+tabelas_treino_oot = carregar_tabelas_treino_oot_parquet(
+    spark=spark,
+    diretorio_entrada="output/tabelas_treino_oot",
+)
+```
 
 ---
 
