@@ -124,6 +124,7 @@ df_resumo_lr = treinamento.executar_treinamento_incremental(
 Também aceita aliases suportados pela factory, por exemplo:
 - `"gradient_boosting"`, `"gb"`, `"gbm"`
 - `"hist_gradient_boosting"`, `"hgb"`, `"hist_gb"`
+- `"xgboost"`, `"xgb"`, `"xg_boost"`
 
 ### 3) (Opcional) Comparar LR vs GB
 

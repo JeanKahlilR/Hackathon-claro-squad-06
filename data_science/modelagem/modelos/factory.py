@@ -4,6 +4,7 @@ from .base import ModeloBase
 from .gradient_boosting import GradientBoosting
 from .hist_gradient_boosting import HistGradientBoosting
 from .regressao_logistica import RegressaoLogistica
+from .xgboost import XGBoost
 
 REGISTRY_MODELOS = {
     "logistica": RegressaoLogistica,
@@ -15,6 +16,9 @@ REGISTRY_MODELOS = {
     "hist_gradient_boosting": HistGradientBoosting,
     "hgb": HistGradientBoosting,
     "hist_gb": HistGradientBoosting,
+    "xgboost": XGBoost,
+    "xgb": XGBoost,
+    "xg_boost": XGBoost,
 }
 
 
@@ -27,7 +31,7 @@ def criar_modelo_factory(tipo: str, **kwargs: Any) -> ModeloBase:
     if classe_modelo is None:
         raise ValueError(
             f"Tipo de modelo '{tipo}' nao reconhecido. "
-            "Use 'logistica', 'gradient_boosting' ou 'hist_gradient_boosting'"
+            "Use 'logistica', 'gradient_boosting', 'hist_gradient_boosting' ou 'xgboost'"
         )
     return classe_modelo(**kwargs)
 

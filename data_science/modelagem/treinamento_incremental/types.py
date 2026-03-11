@@ -54,8 +54,14 @@ class EstadoIncremental:
         Modelos treinados indexados por chave de etapa.
     graficos_ks : Dict[str, Dict[int, str]]
         Caminhos dos graficos KS por tipo de modelo e etapa.
+    importancias_variaveis : Dict[str, pd.DataFrame]
+        DataFrames de importance por modelo/etapa.
+    arquivos_importancia : Dict[str, Dict[str, str]]
+        Caminhos dos artefatos de importance (ex.: CSV, PNG) por modelo/etapa.
     """
 
     resultados: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     modelos_treinados: Dict[str, Any] = field(default_factory=dict)
     graficos_ks: Dict[str, Dict[int, str]] = field(default_factory=dict)
+    importancias_variaveis: Dict[str, pd.DataFrame] = field(default_factory=dict)
+    arquivos_importancia: Dict[str, Dict[str, str]] = field(default_factory=dict)
