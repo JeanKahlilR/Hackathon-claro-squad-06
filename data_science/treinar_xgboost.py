@@ -1,5 +1,5 @@
 """
-Script para treino incremental usando apenas Hist Gradient Boosting (HGB).
+Script para treino incremental usando apenas XGBoost (XGB).
 """
 
 import os
@@ -144,17 +144,17 @@ def salvar_modelo_final_joblib(
 
 def main():
     """
-    Funcao principal para execucao do pipeline de modelagem com HGB.
+    Funcao principal para execucao do pipeline de modelagem com XGBoost.
     """
     configure_logger()
 
     logger.info("=" * 70)
-    logger.info("PIPELINE DE MODELAGEM INCREMENTAL - HIST GRADIENT BOOSTING")
+    logger.info("PIPELINE DE MODELAGEM INCREMENTAL - XGBOOST")
     logger.info("=" * 70)
 
     # 1. Carregar dados
     logger.info("\n>>> ETAPA 1: CARREGAMENTO DE DADOS")
-    spark = make_spark(app_name="hackathon-modelagem-hgb")
+    spark = make_spark(app_name="hackathon-modelagem-xgb")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -173,11 +173,11 @@ def main():
     # 2. Preparar dados para modelagem (split treino/OOT)
     logger.info("\n>>> ETAPA 2: SPLIT TREINO/OOT")
     tabelas_treino_oot, metadata, tabelas_gc = preparar_dados_modelagem(tabelas)
-    tabelas_treino_oot = amostrar_apenas_treino_por_tabela(
+    """tabelas_treino_oot = amostrar_apenas_treino_por_tabela(
         tabelas_treino_oot=tabelas_treino_oot,
         fracao_treino=0.20,
         seed=42,
-    )
+    )"""
 
     logger.info(f"\nDados preparados para {len(tabelas_treino_oot)} tabelas:")
     for table_name, splits in tabelas_treino_oot.items():
@@ -208,26 +208,34 @@ def main():
     )
 
     logger.info("\n" + "=" * 70)
-    logger.info("PARTE UNICA: HIST GRADIENT BOOSTING")
+    logger.info("PARTE UNICA: XGBOOST")
     logger.info("=" * 70)
 
-    df_resumo_hgb = treinamento.executar_treinamento_incremental(
-        tipo_modelo="hist_gradient_boosting",
+    df_resumo_xgb = treinamento.executar_treinamento_incremental(
+        tipo_modelo="xgboost",
         params_modelo={
-            "max_iter": 1000,
-            "learning_rate": 0.1,
-            "max_depth": None,
-            "max_leaf_nodes": 31,
-            "min_samples_leaf": 50,
-            "max_bins": 128,
-            "l2_regularization": 1.0,
-            "early_stopping": "auto",
-            "n_iter_no_change": 50,
+            "n_estimators": 1000,
+            "learning_rate": 0.05,
+            "max_depth": 6,
+            "min_child_weight": 1.0,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "gamma": 0.0,
+            "reg_alpha": 0.0,
+            "reg_lambda": 1.0,
+            "objective": "binary:logistic",
+            "eval_metric": "auc",
+            "importance_type": "gain",
+            "tree_method": "hist",
+            "n_jobs": -1,
+            "random_state": 42,
+            "verbosity": 0,
         },
         salvar_graficos_ks=True,
-        output_dir_graficos="output/ks_por_etapa_hgb",
+        output_dir_graficos="output/ks_por_etapa_xgb",
         calcular_importancia_variaveis=True,
-        output_dir_importancia="output/importancia_variaveis_hgb",
+        metodo_importancia="xgboost_native",
+        output_dir_importancia="output/importancia_variaveis_xgb",
         scoring_importancia="roc_auc",
         n_repeats_importancia=10,
         salvar_grafico_importancia=True,
@@ -236,9 +244,9 @@ def main():
 
     # 4. Salvar resultados
     logger.info("\n>>> ETAPA 4: SALVANDO RESULTADOS")
-    caminho_resultados = "output/resultados_incrementais_hgb.csv"
-    caminho_matriz_confusao = "output/matriz_confusao_por_etapa_hgb.csv"
-    caminho_modelo_final = "output/modelo_final_hgb.pkl"
+    caminho_resultados = "output/resultados_incrementais_xgb.csv"
+    caminho_matriz_confusao = "output/matriz_confusao_por_etapa_xgb.csv"
+    caminho_modelo_final = "output/modelo_final_xgb.pkl"
 
     treinamento.salvar_resultados(caminho=caminho_resultados)
     salvar_matrizes_confusao_por_etapa(
@@ -250,7 +258,7 @@ def main():
         caminho=caminho_modelo_final,
         etapa_final=max(treinamento.etapas),
     )
-    df_resumo_hgb.to_csv("output/resumo_hist_gradient_boosting_hgb.csv", index=False)
+    df_resumo_xgb.to_csv("output/resumo_xgboost_xgb.csv", index=False)
     graficos_ks = treinamento.graficos_ks
     arquivos_importancia = treinamento.estado.arquivos_importancia
 
@@ -261,10 +269,10 @@ def main():
     logger.info(f"  - {caminho_resultados}")
     logger.info(f"  - {caminho_matriz_confusao}")
     logger.info(f"  - {caminho_modelo_final}")
-    logger.info("  - output/resumo_hist_gradient_boosting_hgb.csv")
-    logger.info("  - output/ks_por_etapa_hgb/*.png")
-    logger.info("  - output/importancia_variaveis_hgb/*.csv")
-    logger.info("  - output/importancia_variaveis_hgb/*.png")
+    logger.info("  - output/resumo_xgboost_xgb.csv")
+    logger.info("  - output/ks_por_etapa_xgb/*.png")
+    logger.info("  - output/importancia_variaveis_xgb/*.csv")
+    logger.info("  - output/importancia_variaveis_xgb/*.png")
     for nome_modelo, caminhos_por_etapa in graficos_ks.items():
         for etapa, caminho_grafico in caminhos_por_etapa.items():
             logger.info(f"  - {caminho_grafico} ({nome_modelo}, etapa {etapa})")
@@ -284,7 +292,7 @@ def main():
         "tables_gc": tabelas_gc,
         "metadata": metadata,
         "treinamento": treinamento,
-        "resultados_hgb": df_resumo_hgb,
+        "resultados_xgb": df_resumo_xgb,
         "graficos_ks": graficos_ks,
         "arquivos_importancia": arquivos_importancia,
     }
