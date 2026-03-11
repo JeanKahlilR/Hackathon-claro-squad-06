@@ -7,9 +7,12 @@ requires-python = ">=3.14"
 dependencies = [
     "joblib>=1.5.3",
     "loguru>=0.7.3",
+    "oci>=2.168.0",
     "pandas>=3.0.0",
+    "pyarrow>=23.0.1",
     "pyspark>=4.1.1",
     "pytest>=9.0.2",
     "scikit-learn>=1.8.0",
     "scikit-plot>=0.3.7",
+    "xgboost>=3.2.0",
 ]
