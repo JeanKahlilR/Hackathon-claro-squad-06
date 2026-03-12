@@ -101,57 +101,96 @@ flowchart LR
 ![Google Colab](https://img.shields.io/badge/Colab-Research-F9AB00?style=for-the-badge&logo=googlecolab&logoColor=white)
 
 
-## Arquitetura de Dados Proposta (AWS Cloud)
-![Descrição da Imagem](docs/Arquitetura_AWS.webp)
+# Arquitetura de Dados: Behavior Score na Oracle Cloud (OCI)
+1. Visão Geral da Solução
 
-A arquitetura proposta foi desenhada seguindo os pilares do `AWS Well-Architected Framework`, priorizando uma abordagem `Serverless (sem servidor)`. Isso garante que o foco do time esteja na lógica de negócio e na ciência de dados, delegando o gerenciamento de infraestrutura para a AWS, o que resulta em maior eficiência operacional, escalabilidade automática e otimização de custos.
+A arquitetura proposta foi desenhada na Oracle Cloud Infrastructure (OCI) seguindo as melhores práticas de Cloud Native e o pilar de Otimização de Custos (FinOps). O projeto adota uma abordagem 100% Serverless orientada a eventos, combinada com o padrão Lakehouse (Medalhão). Isso garante escalabilidade horizontal transparente, segurança "by design" e um modelo de cobrança estritamente pay-as-you-go (pague pelo uso).
 
-O fluxo de dados segue a arquitetura de referência `"Medalhão" (Bronze/Silver/Gold)`, garantindo a qualidade, rastreabilidade e governança dos dados desde a ingestão até a modelagem preditiva.
+![GIF](docs/arquitetura-hackaton-Oracle.gif)
 
-**1 - Ingestão e Orquestração (Ingestion Layer)**
+## 2. Detalhamento da Arquitetura por Camada
 
-- `Ferramentas`: AWS Glue Python Shell, Amazon EventBridge, AWS Secrets Manager.
-- `Como funciona`: O processo inicia-se com uma rotina agendada no Amazon EventBridge, que dispara um script de ingestão no AWS Glue Python Shell. Este script conecta-se ao Google Drive, baixa os arquivos de origem e os deposita na camada crua. **O encadeamento das etapas subsequentes é gerenciado nativamente, garantindo que a transformação só inicie após o sucesso da ingestão.**
-- `Motivo da Escolha`:
-    - `AWS Glue Python Shell`: Escolhido em detrimento do AWS Lambda para eliminar o risco de timeout (limite de 15 min) e estouro de memória ao processar arquivos volumosos, garantindo robustez para grandes cargas de dados.
-    - `Amazon EventBridge`: Desacopla o agendamento da execução, permitindo uma arquitetura orientada a eventos.
-    - `AWS Secrets Manager`: Elimina credenciais hardcoded, garantindo que chaves de API trafeguem criptografadas e em conformidade com normas de segurança.
+### A. Ingestão Segura e Serverless (Ingestion Layer)
 
-**2 - Armazenamento e Data Lake (Storage Layer)**
+* **Serviços OCI:** Events, Functions, Vault.
 
-- `Ferramentas`: Amazon S3 (Buckets Raw, Silver, Gold).
-- `Como funciona`: O Amazon S3 atua como o repositório central com três estágios lógicos (Bronze/Silver/Gold).
-    - `Raw`: Dados brutos e imutáveis (Auditabilidade).
-    - `Silver`: Dados limpos e convertidos para Parquet com compressão Snappy, otimizando performance de I/O.
-    - `Gold`: Dados agregados (Feature Store) prontos para o modelo.
-- `Motivo da Escolha`: Além da durabilidade de "11 noves", o S3 permite aplicar **Lifecycle Policies (Políticas de Ciclo de Vida)** para mover dados antigos para classes de armazenamento mais baratas (Glacier) automaticamente, atendendo ao pilar de Otimização de Custos.
+* **Como funciona:**
+O pipeline é totalmente automatizado. O OCI Events atua como gatilho (cron) que invoca o OCI Functions. Para garantir conformidade de segurança e eliminar credenciais hardcoded, a função utiliza **Resource Principals** para buscar a chave do Google Drive criptografada no OCI Vault. Em seguida, realiza a carga incremental dos dados, depositando-os no Data Lake.
 
-**3 - Processamento e Transformação (Processing Layer)**
+### B. Data Lake e Processamento (Storage & Processing Layer)
 
-- `Ferramentas`: AWS Glue Jobs (Spark).
-- `Como funciona`: Jobs Spark processam os dados de forma distribuída.
-- `Motivo da Escolha`: O AWS Glue é totalmente gerenciado. A escolha pelo Spark permite processamento paralelo massivo, essencial para recalcular o score de milhões de clientes em minutos, garantindo `escalabilidade horizontal` transparente.
+* **Serviços OCI:** Object Storage, Data Flow.
 
-**4 - Governança e Catálogo (Data Governance)**
+* **Como funciona:**
+Os dados fluem por três estágios lógicos no OCI Object Storage:
 
-- `Ferramentas`: AWS Glue Crawler, AWS Glue Data Catalog, AWS Lake Formation.
-- `Como funciona`: O Crawler infere esquemas automaticamente (Schema Evolution) e o Lake Formation gerencia o acesso.
-- `Motivo da Escolha`:
-    - `AWS Lake Formation`: É o diferencial de segurança do projeto. Ele permite implementar **segurança a nível de linha e coluna (ex: mascarar o CPF e Renda para analistas júnior)**, garantindo conformidade estrita com a **LGPD** sem necessidade de duplicar dados anonimizados.
+    * **Bronze (Raw):** dados brutos ingeridos (~5.33 GiB).
+    * **Silver (Cleaned):** dados higienizados e convertidos para Parquet (~5.14 GiB fragmentados em 943 objetos).
+    * **Gold (Feature Store):** dados agregados prontos para consumo (~1.72 GiB).
 
-**5 - Consumo, Analytics e Machine Learning**
+* **O motor de ETL:**
+A transformação entre as camadas é feita pelo OCI Data Flow (Apache Spark 100% gerenciado). Ele processa a volumetria de forma distribuída e desliga a infraestrutura imediatamente após a conclusão.
 
-- `Ferramentas`: Amazon Athena, Amazon SageMaker.
-- `Como funciona`: O Athena permite SQL ad-hoc e o SageMaker gerencia o ciclo de vida do modelo.
-- `Motivo da Escolha`:
-    - `Amazon Athena`: Custo zero de infraestrutura fixa, pagando apenas por terabyte scaneado.
-    - `Amazon SageMaker`: Além do treinamento, utilizamos o **SageMaker Model Registry** para versionar os artefatos do modelo (.pkl), garantindo que saibamos exatamente qual versão do modelo gerou qual score, assegurando a reprodutibilidade científica.
+### C. Governança e Segurança (Data Catalog & IAM)
 
-**6 - Observabilidade e Operações (Ops & Monitoring)**
+* **Serviços OCI:** Data Catalog, IAM.
 
-- `Ferramentas`: Amazon CloudWatch, Amazon SNS.
-- `Como funciona`: Monitoramento centralizado de logs, métricas e alarmes.
-`Motivo da Escolha`: Atende ao pilar de Excelência Operacional. A configuração de alarmes no CloudWatch integrados ao SNS permite uma abordagem **proativa**: o time é notificado sobre falhas de pipeline ou degradação de performance antes que o negócio seja impactado.
+* **Como funciona:**
+O OCI Data Catalog realiza o **Harvesting automático**, inferindo os esquemas do Object Storage para garantir que os dados sejam descobríveis. O OCI IAM aplica políticas de acesso granular (RBAC), garantindo que apenas os serviços autorizados e os cientistas acessem a Feature Store.
+
+### D. Consumo e Machine Learning (Consumption Layer)
+
+* **Serviços OCI:** MySQL HeatWave, Data Science.
+
+* **Como funciona:**
+O MySQL HeatWave permite consultas SQL analíticas de alta performance diretamente no Object Storage. Em paralelo, o OCI Data Science consome a camada Gold para o treinamento e inferência do modelo de Machine Learning (**Behavior Score**).
+
+### E. Observabilidade Proativa (Observability & Monitoring)
+
+* **Serviços OCI:** Logging, Monitoring, Notifications.
+
+* **Como funciona:**
+Toda a telemetria do Functions e do Data Flow é enviada para a central de observabilidade. O OCI Logging retém os rastreios de execução, enquanto o OCI Monitoring avalia o *health* da esteira. Qualquer falha nos jobs aciona o OCI Notifications, que alerta a engenharia proativamente.
+
+---
+
+## 3. Estratégia de Infraestrutura e FinOps
+
+Uma arquitetura madura não é apenas funcional, mas também financeiramente otimizada.
+
+### Otimização do OCI Data Flow (Apache Spark)
+
+* **Cenário inicial:**
+O job `Job_Bronze_to_Silver` utilizava uma máquina `VM.Standard.E4.Flex` com **4 OCPUs** e **32 GB de RAM**.
+
+* **Ajuste FinOps:**
+Para processar a volumetria mensal de ~12.2 GiB, essa máquina estava superdimensionada. Reduzimos o *shape* na estimativa final para:
+
+    * **Driver:** 2 OCPUs e 16 GB de RAM.
+    * **Executors:** 2 instâncias de 1 OCPU e 8 GB de RAM cada.
+
+    * **Justificativa:**
+Essa configuração lida com o volume atual com extrema folga, mitigando o problema de *Small Files* (visto na camada Silver) e derrubando o custo computacional do ETL para centavos de dólar.
+
+### Dimensionamento do OCI Data Science
+
+* **Cenário:**
+Equipe de 3 Cientistas de Dados trabalhando em horário comercial (**176 horas mensais cada**).
+
+* **Ajuste FinOps:**
+Configuramos 3 instâncias separadas, para evitar concorrência de kernel e garantir governança individual, operando por 176 horas úteis. O serviço conta com **Auto-Deactivation** para desligar as instâncias ociosas (por exemplo, finais de semana), garantindo que pagaremos apenas por **528 horas totais no mês**, e não pelas horas ociosas.
+
+---
+
+## 4. Total Cost of Ownership (TCO) Mensal Estimado
+
+A tabela abaixo detalha a estimativa de custos para o processamento de toda a rotina mensal, com base na calculadora oficial da OCI.
+
+![Descrição da Imagem](docs/tabela_custos_oci.png)
+
+**Conclusão de negócio:**
+
+> Nossa arquitetura prova matematicamente o valor do modelo *serverless* na nuvem Oracle. Toda a nossa esteira de ingestão, armazenamento e ETL do Lakehouse tem custo quase nulo (~US$ 0,45/mês). O investimento de ~US$ 48 foca exclusivamente no que gera valor para o negócio: a infraestrutura computacional para nossos cientistas de dados treinarem o Behavior Score.
 
 
 
